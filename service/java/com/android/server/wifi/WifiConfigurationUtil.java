@@ -259,8 +259,13 @@ public class WifiConfigurationUtil {
         if (config == null || hashFunction == null) {
             return null;
         }
-        byte[] hashedBytes = hashFunction.doFinal(
-                config.getSsidAndSecurityTypeString().getBytes(StandardCharsets.UTF_8));
+        byte[] hashedBytes;
+        try {
+            hashedBytes = hashFunction.doFinal(
+                    config.getSsidAndSecurityTypeString().getBytes(StandardCharsets.UTF_8));
+        } catch (ProviderException | IllegalStateException e) {
+            return null;
+        }
         ByteBuffer bf = ByteBuffer.wrap(hashedBytes);
         long longFromSsid = bf.getLong();
         /**

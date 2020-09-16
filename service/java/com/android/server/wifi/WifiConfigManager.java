@@ -513,15 +513,13 @@ public class WifiConfigManager {
                 mRandomizedMacAddressMapping.remove(config.getSsidAndSecurityTypeString());
             }
         }
-        MacAddress result = mMacAddressUtil.calculatePersistentMacForConfiguration(
-                config, mMacAddressUtil.obtainMacRandHashFunction(Process.WIFI_UID));
+        MacAddress result = WifiConfigurationUtil.calculatePersistentMacForConfiguration(config,
+                WifiConfigurationUtil.obtainMacRandHashFunction(Process.WIFI_UID));
         if (result == null) {
-            result = mMacAddressUtil.calculatePersistentMacForConfiguration(
-                    config, mMacAddressUtil.obtainMacRandHashFunction(Process.WIFI_UID));
+            result = WifiConfigurationUtil.calculatePersistentMacForConfiguration(config,
+                    WifiConfigurationUtil.obtainMacRandHashFunction(Process.WIFI_UID));
         }
         if (result == null) {
-            Log.wtf(TAG, "Failed to generate MAC address from KeyStore even after retrying. "
-                    + "Using locally generated MAC address instead.");
             result = MacAddress.createRandomUnicastAddress();
         }
         return result;
@@ -549,7 +547,7 @@ public class WifiConfigManager {
      */
     public void enableVerboseLogging(int verbose) {
         if (verbose > 0) {
-            mVerboseLoggingEnabled = true;
+            mVerboseLoggingEnabled = false;
         } else {
             mVerboseLoggingEnabled = false;
         }
