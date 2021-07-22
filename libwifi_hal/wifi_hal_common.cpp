@@ -42,6 +42,12 @@ extern "C" int delete_module(const char *, unsigned int);
 #define WIFI_DRIVER_MODULE_ARG ""
 #endif
 
+#ifdef WIFI_DRIVER_OPERSTATE_PATH
+#include <sys/stat.h>
+#define OPERSTATE_UP "up"
+#define OPERSTATE_DOWN "down"
+#endif
+
 static const char DRIVER_PROP_NAME[] = "wlan.driver.status";
 static bool is_driver_loaded = false;
 #ifdef WIFI_DRIVER_MODULE_PATH
@@ -94,8 +100,20 @@ int wifi_change_driver_state(const char *state) {
   int len;
   int fd;
   int ret = 0;
+  int count = 5; /* wait at most 1 second for completion */
 
   if (!state) return -1;
+
+  do {
+    if (access(WIFI_DRIVER_STATE_CTRL_PARAM, W_OK) == 0)
+      break;
+    usleep(200000);
+  } while (--count > 0);
+    if (count == 0) {
+      PLOG(ERROR) << "Failed to access driver state control param " << strerror(errno) << ", " << errno;
+      return -1;
+  }
+
   fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_STATE_CTRL_PARAM, O_WRONLY));
   if (fd < 0) {
     PLOG(ERROR) << "Failed to open driver state control param";
@@ -158,6 +176,40 @@ int is_wifi_driver_loaded() {
 #endif
 }
 
+#ifdef WIFI_DRIVER_OPERSTATE_PATH
+int is_wifi_driver_ready() {
+  struct stat sbuf;
+  FILE *fstate;
+  char operstate[8];
+  int open_count = 25, read_count = 25;
+  while (open_count-- >= 0) {
+    if (stat(WIFI_DRIVER_OPERSTATE_PATH, &sbuf) == 0) {
+      if ((fstate = fopen(WIFI_DRIVER_OPERSTATE_PATH, "r")) == NULL) {
+        usleep(500000);
+      } else {
+        break;
+      }
+    } else {
+      usleep(500000);
+    }
+  }
+  if (fstate != NULL) {
+    while (read_count-- >= 0) {
+      fgets(operstate, sizeof(operstate), fstate);
+      if (strncmp(operstate, OPERSTATE_UP, strlen(OPERSTATE_UP)) == 0 ||
+          strncmp(operstate, OPERSTATE_DOWN, strlen(OPERSTATE_DOWN)) == 0) {
+        PLOG(INFO) << "Wifi driver is ready";
+        return 1;
+      }
+      PLOG(WARNING) << "Waiting for Wifi driver to get ready. (" << read_count << ")";
+      usleep(500000);
+    }
+    fclose(fstate);
+  }
+  return 0;
+}
+#endif
+
 int wifi_load_driver() {
 #ifdef WIFI_DRIVER_MODULE_PATH
   if (is_wifi_driver_loaded()) {
@@ -186,6 +238,14 @@ int wifi_load_driver() {
     return -1;
   }
 #endif
+
+#ifdef WIFI_DRIVER_OPERSTATE_PATH
+  if (!is_wifi_driver_ready()) {
+    PLOG(ERROR) << "Wifi driver didn't get ready in time, giving up!";
+    return -1;
+  }
+#endif
+
   is_driver_loaded = true;
   return 0;
 }
